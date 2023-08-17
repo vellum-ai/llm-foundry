@@ -7,7 +7,8 @@ import os
 from typing import Mapping
 
 # required for loading a python model into composer
-from composer.metrics.nlp import (InContextLearningLMAccuracy,
+from composer.metrics.nlp import (InContextLearningCodeEvalAccuracy,
+                                  InContextLearningLMAccuracy,
                                   InContextLearningLMExpectedCalibrationError,
                                   InContextLearningMCExpectedCalibrationError,
                                   InContextLearningMultipleChoiceAccuracy,
@@ -86,6 +87,7 @@ class ComposerHFCausalLM(HuggingFaceModelWithZLoss):
             LanguagePerplexity(),
             InContextLearningLMAccuracy(),
             InContextLearningMultipleChoiceAccuracy(),
+            InContextLearningCodeEvalAccuracy(),
             InContextLearningQAAccuracy(),
             InContextLearningLMExpectedCalibrationError(),
             InContextLearningMCExpectedCalibrationError()
