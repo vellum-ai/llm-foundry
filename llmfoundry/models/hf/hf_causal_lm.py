@@ -77,6 +77,16 @@ class ComposerHFCausalLM(HuggingFaceModelWithZLoss):
     def __init__(self, om_model_config: DictConfig,
                  tokenizer: PreTrainedTokenizerBase):
 
+        if not om_model_config.get('trust_remote_code',
+                                   True) and om_model_config.get(
+                                       'pretrained_model_name_or_path',
+                                       None).startswith('mosaicml/mpt'):
+            raise ValueError(
+                'trust_remote_code must be set to True for MPT models. Without this, the MPT model code will come from the transformers library, '
+                +
+                'which is not significantly slower and not compatible with the LLM foundry training code, rather than the code release by MosaicML.'
+            )
+
         # set up training and eval metrics
         train_metrics = [
             LanguageCrossEntropy(),
@@ -89,9 +99,11 @@ class ComposerHFCausalLM(HuggingFaceModelWithZLoss):
             InContextLearningMultipleChoiceAccuracy(),
             InContextLearningCodeEvalAccuracy(),
             InContextLearningQAAccuracy(),
+            InContextLearningCodeEvalAccuracy(),
             InContextLearningLMExpectedCalibrationError(),
             InContextLearningMCExpectedCalibrationError()
         ]
+
 
         # load the model config
         trust_remote_code = om_model_config.get('trust_remote_code', True)
@@ -111,15 +123,73 @@ class ComposerHFCausalLM(HuggingFaceModelWithZLoss):
 
             attr = getattr(config, k)
             if isinstance(attr, Mapping):
-                extra_keys = [_k for _k in v.keys() if _k not in attr.keys()]
+                extra_keys = [
+                    _k for _k in v.keys() if _k not in attr.keys()
+                ]
                 if extra_keys:
                     raise ValueError(
                         f'Config dict override got unknown keys. ' +
                         f'Extra keys: {extra_keys}. ' +
-                        f'Expected (a subset of) keys: {list(attr.keys())}.')
+                        f'Expected (a subset of) keys: {list(attr.keys())}.'
+                    )
                 getattr(config, k).update(v)
             else:
                 setattr(config, k, v)
+
+        load_in_8bit = om_model_config.get('load_in_8bit', False)
+
+        # below we set up the device to initialize the model on
+        init_device = om_model_config.get('init_device', 'cpu')
+
+        # Get the device we want to initialize, and use the
+        # reolved version to initialize the HF model
+        resolved_init_device = hf_get_init_device(init_device)
+
+        # We need to have all non-zero local ranks be not-pretrained
+        # Rank 0 will still be pretrained, and distribute the weights appropriately
+        if dist.get_local_rank() != 0 and init_device == 'mixed':
+            om_model_config.pretrained = False
+
+        # initialize the model on the correct device
+        if resolved_init_device == 'cpu':
+            if om_model_config.pretrained:
+                model = AutoModelForCausalLM.from_pretrained(
+                    om_model_config.pretrained_model_name_or_path,
+                    trust_remote_code=trust_remote_code,
+                    use_auth_token=use_auth_token,
+                    load_in_8bit=load_in_8bit,
+                    config=config)
+            else:
+                model = AutoModelForCausalLM.from_config(
+                    config,
+                    trust_remote_code=trust_remote_code,
+                )
+        elif resolved_init_device == 'meta':
+            if om_model_config.pretrained:
+                raise ValueError(
+                    'Setting cfg.pretrained=True is not supported when init_device="meta".'
+                )
+            with init_empty_weights(include_buffers=False):
+                model = AutoModelForCausalLM.from_config(
+                    config,
+                    trust_remote_code=trust_remote_code,
+                )
+        else:
+            raise ValueError(
+                f'config does not have attribute "{k}" to override ({k}: {v}).'
+            )
+
+        attr = getattr(config, k)
+        if isinstance(attr, Mapping):
+            extra_keys = [_k for _k in v.keys() if _k not in attr.keys()]
+            if extra_keys:
+                raise ValueError(
+                    f'Config dict override got unknown keys. ' +
+                    f'Extra keys: {extra_keys}. ' +
+                    f'Expected (a subset of) keys: {list(attr.keys())}.')
+            getattr(config, k).update(v)
+        else:
+            setattr(config, k, v)
 
         # below we set up the device to initialize the model on
         init_device = om_model_config.get('init_device', 'cpu')
