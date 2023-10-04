@@ -101,6 +101,7 @@ def hf_get_hidden_layers(model: PreTrainedModel):
         'layers',  # ProphetNet, Marian (from encoder)
         'model.layers',  # LLaMa
         'transformer.blocks',  # MPT
+        'model.model.layers',  # Mistral-7B LoRA
     )
     return findattr(model, hidden_layers_attrs)
 
