@@ -50,7 +50,7 @@ classifiers = [
 install_requires = [
     "mosaicml[libcloud,wandb,mlflow]>=0.15.0,<0.16",
     "accelerate>=0.20,<0.21",  # for HF inference `device_map`
-    "git+https://github.com/huggingface/transformers",
+    "transformers@git+https://github.com/huggingface/transformers",
     "mosaicml-streaming>=0.5.1,<0.6",
     "torch>=1.13.1,<=2.0.1",
     "datasets==2.10.1",
