@@ -3,7 +3,7 @@ import shutil
 from typing import Any
 
 from composer.core import Callback
-from composer.utils.object_store import GCSObjectStore
+from composer.utils.object_store.gcs_object_store import GCSObjectStore
 
 
 class SavePeftCallback(Callback):
