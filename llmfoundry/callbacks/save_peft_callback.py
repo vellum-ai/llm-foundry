@@ -1,5 +1,6 @@
 import os
 import shutil
+import tempfile
 from typing import Any
 
 from composer.core import Callback
@@ -14,14 +15,13 @@ class SavePeftCallback(Callback):
         super().__init__(**kwargs)
 
     def epoch_checkpoint(self, state, logger):
-        save_folder = f"adapter_ep{state.timestamp.epoch.value}"
+        path_prefix = f"adapter_ep{state.timestamp.epoch.value}"
 
-        peft_model = state.model.model
-        peft_model.save_pretrained(save_folder)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            peft_model = state.model.model
+            peft_model.save_pretrained(tmpdir)
 
-        for filename in os.listdir(save_folder):
-            path = os.path.join(save_folder, filename)
-            self.store.upload_object(path, path)
-
-        # Remove the folder
-        shutil.rmtree(save_folder)
+            for filename in os.listdir(tmpdir):
+                local_path = os.path.join(tmpdir, filename)
+                remote_path = os.path.join(path_prefix, filename)
+                self.store.upload_object(remote_path, local_path)
