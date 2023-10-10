@@ -24,7 +24,7 @@ class SavePeftCallback(Callback):
             # Create full filepath
             filepath = os.path.join(save_folder, filename)
             # Upload the file to GCS
-            self.store.upload(filepath, filename)
+            self.store.upload_object(filepath, filename)
 
         # Remove the folder
         shutil.rmtree(save_folder)
