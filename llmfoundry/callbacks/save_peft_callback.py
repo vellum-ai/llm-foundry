@@ -1,5 +1,4 @@
 import os
-import shutil
 import tempfile
 from typing import Any
 
@@ -15,13 +14,16 @@ class SavePeftCallback(Callback):
         super().__init__(**kwargs)
 
     def epoch_checkpoint(self, state, logger):
-        path_prefix = f"adapter_ep{state.timestamp.epoch.value}"
+        try:
+            path_prefix = f"adapter_ep{state.timestamp.epoch.value}"
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            peft_model = state.model.model
-            peft_model.save_pretrained(tmpdir)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                peft_model = state.model.model
+                peft_model.save_pretrained(tmpdir)
 
-            for filename in os.listdir(tmpdir):
-                local_path = os.path.join(tmpdir, filename)
-                remote_path = os.path.join(path_prefix, filename)
-                self.store.upload_object(remote_path, local_path)
+                for filename in os.listdir(tmpdir):
+                    local_path = os.path.join(tmpdir, filename)
+                    remote_path = os.path.join(path_prefix, filename)
+                    self.store.upload_object(remote_path, local_path)
+        except Exception:
+            logger.exception("Failed to save PEFT model")
