@@ -4,6 +4,7 @@ from typing import Any
 
 from composer.core import Callback
 from composer.utils.object_store.gcs_object_store import GCSObjectStore
+from retrying import retry
 
 
 class SavePeftCallback(Callback):
@@ -24,6 +25,14 @@ class SavePeftCallback(Callback):
                 for filename in os.listdir(tmpdir):
                     local_path = os.path.join(tmpdir, filename)
                     remote_path = os.path.join(path_prefix, filename)
-                    self.store.upload_object(remote_path, local_path)
-        except Exception:
-            logger.exception("Failed to save PEFT model")
+                    self._upload_object(remote_path, local_path)
+        except Exception as e:
+            logger.warning(f"Failed to save PEFT model: {e}")
+
+    @retry(
+        stop_max_attempt_number=5,
+        wait_random_min=5000,
+        wait_random_max=10000,
+    )
+    def _upload_object(self, remote_path: str, local_path: str):
+        self.store.upload_object(remote_path, local_path)
