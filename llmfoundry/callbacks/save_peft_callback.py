@@ -3,7 +3,6 @@ import tempfile
 from typing import Any
 
 from composer.core import Callback
-from composer.utils import dist
 from composer.utils.object_store.gcs_object_store import GCSObjectStore
 from retrying import retry
 
@@ -16,9 +15,6 @@ class SavePeftCallback(Callback):
         super().__init__(**kwargs)
 
     def epoch_checkpoint(self, state, logger):
-        if dist.get_global_rank() != 0:
-            return
-
         try:
             path_prefix = f"adapter_ep{state.timestamp.epoch.value}"
 
